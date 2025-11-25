@@ -26,13 +26,13 @@ const ALL_COLUMNS = [
   { key: 'celular', label: 'Celular' },
   { key: 'programa', label: 'Programa' },
   { key: 'lattes', label: 'Link Lattes' },
-  { key: 'banco', label: 'Banco' },
+  { key: 'banco1', label: 'Banco' },
   { key: 'pix', label: 'PIX' },
-  { key: 'agencia', label: 'Agência' },
-  { key: 'conta', label: 'Conta Corrente' },
-  { key: 'banco2', label: 'Banco 2' },
-  { key: 'agencia2', label: 'Agência 2' },
-  { key: 'conta2', label: 'Conta Corrente 2' },
+  { key: 'agencia1', label: 'Agência' },
+  { key: 'conta1', label: 'Conta Corrente' },
+  { key: 'banco2', label: 'Banco (2)' },
+  { key: 'agencia2', label: 'Agência (2)' },
+  { key: 'conta2', label: 'Conta Corrente (2)' },
 ];
 
 // Grupos de colunas para seleção rápida
@@ -40,7 +40,7 @@ const COLUMN_GROUPS = [
   { name: 'Dados Pessoais', columns: ['nome', 'email', 'cpf', 'rg', 'nascimento', 'orgaoExpedidor', 'expedicaoRg'] },
   { name: 'Contato', columns: ['email', 'telFixo', 'celular', 'endereco'] },
   { name: 'Profissional', columns: ['formacao', 'matricula', 'ctf', 'conselho', 'programa', 'lattes'] },
-  { name: 'Dados Bancários', columns: ['banco', 'pix', 'agencia', 'conta', 'banco2', 'agencia2', 'conta2'] },
+  { name: 'Dados Bancários', columns: ['banco1', 'pix', 'agencia1', 'conta1', 'banco2', 'agencia2', 'conta2'] },
 ];
 
 const ConsultaCadastro = () => {
