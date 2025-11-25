@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, User, UserPlus, Settings, CheckSquare, Square, Database, RefreshCw, ChevronDown, ChevronUp, Copy, Check, X, Save, AlertCircle, Loader2 } from 'lucide-react';
+import { Search, User, UserPlus, Settings, CheckSquare, Square, Database, RefreshCw, ChevronDown, ChevronUp, Copy, Check, X, Save, AlertCircle, Loader2, FileSpreadsheet, FileText, Users, Trash2 } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel, AlignmentType, WidthType, BorderStyle } from 'docx';
+import { saveAs } from 'file-saver';
 
 // ID da planilha do Google Sheets
 const SPREADSHEET_ID = '1kXr-u32PrCVzNRAnDLY1-frhHlsgKNCsWJhCewJocT8';
@@ -24,11 +27,11 @@ const ALL_COLUMNS = [
   { key: 'programa', label: 'Programa' },
   { key: 'lattes', label: 'Link Lattes' },
   { key: 'bancoPix', label: 'Banco PIX' },
-  { key: 'agenciaPix', label: 'Agência' },
-  { key: 'contaPix', label: 'Conta Corrente' },
-  { key: 'banco2', label: 'Banco' },
-  { key: 'agencia2', label: 'Agência' },
-  { key: 'conta2', label: 'Conta Corrente' },
+  { key: 'agenciaPix', label: 'Agência PIX' },
+  { key: 'contaPix', label: 'Conta Corrente PIX' },
+  { key: 'banco2', label: 'Banco 2' },
+  { key: 'agencia2', label: 'Agência 2' },
+  { key: 'conta2', label: 'Conta Corrente 2' },
 ];
 
 // Grupos de colunas para seleção rápida
@@ -52,7 +55,7 @@ const ConsultaCadastro = () => {
   
   // Estados de busca
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedPerson, setSelectedPerson] = useState(null);
+  const [selectedPeople, setSelectedPeople] = useState([]); // Array para múltiplas pessoas
   const [showSuggestions, setShowSuggestions] = useState(false);
   
   // Estados do formulário de novo cadastro
@@ -109,7 +112,6 @@ const ConsultaCadastro = () => {
     }
     
     try {
-      
       // Parse do CSV
       const lines = csvText.split('\n');
       const headers = parseCSVLine(lines[0]); // Primeira linha são os cabeçalhos
@@ -179,14 +181,17 @@ const ConsultaCadastro = () => {
     loadData();
   }, []);
 
-  // Filtro de sugestões de busca
+  // Filtro de sugestões de busca (exclui já selecionados)
   const suggestions = useMemo(() => {
     if (!searchTerm || searchTerm.length < 2) return [];
     const term = searchTerm.toLowerCase();
+    const selectedNames = selectedPeople.map(p => p.nome.toLowerCase());
     return data.filter(person => 
-      person.nome && person.nome.toLowerCase().includes(term)
+      person.nome && 
+      person.nome.toLowerCase().includes(term) &&
+      !selectedNames.includes(person.nome.toLowerCase())
     ).slice(0, 10);
-  }, [searchTerm, data]);
+  }, [searchTerm, data, selectedPeople]);
 
   // Toggle de coluna
   const toggleColumn = (key) => {
@@ -225,18 +230,167 @@ const ConsultaCadastro = () => {
     }
   };
 
-  // Selecionar pessoa da busca
-  const selectPerson = (person) => {
-    setSelectedPerson(person);
-    setSearchTerm(person.nome);
+  // Adicionar pessoa à seleção
+  const addPerson = (person) => {
+    if (!selectedPeople.find(p => p.nome === person.nome)) {
+      setSelectedPeople(prev => [...prev, person]);
+    }
+    setSearchTerm('');
     setShowSuggestions(false);
+  };
+
+  // Remover pessoa da seleção
+  const removePerson = (personToRemove) => {
+    setSelectedPeople(prev => prev.filter(p => p.nome !== personToRemove.nome));
   };
 
   // Limpar busca
   const clearSearch = () => {
     setSearchTerm('');
-    setSelectedPerson(null);
+    setSelectedPeople([]);
     setShowSuggestions(false);
+  };
+
+  // Exportar para XLSX
+  const exportToXLSX = () => {
+    if (selectedPeople.length === 0) {
+      alert('Selecione pelo menos uma pessoa para exportar.');
+      return;
+    }
+
+    // Prepara os dados para exportação
+    const exportData = selectedPeople.map(person => {
+      const row = {};
+      selectedColumns.forEach(colKey => {
+        const col = ALL_COLUMNS.find(c => c.key === colKey);
+        row[col.label] = person[colKey] || '';
+      });
+      return row;
+    });
+
+    // Cria o workbook e worksheet
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Cadastros');
+
+    // Ajusta largura das colunas
+    const colWidths = selectedColumns.map(colKey => {
+      const col = ALL_COLUMNS.find(c => c.key === colKey);
+      return { wch: Math.max(col.label.length, 20) };
+    });
+    ws['!cols'] = colWidths;
+
+    // Gera e baixa o arquivo
+    const fileName = `cadastros_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+  };
+
+  // Exportar para DOCX
+  const exportToDOCX = async () => {
+    if (selectedPeople.length === 0) {
+      alert('Selecione pelo menos uma pessoa para exportar.');
+      return;
+    }
+
+    const children = [];
+
+    // Título
+    children.push(
+      new Paragraph({
+        text: 'Relatório de Cadastros',
+        heading: HeadingLevel.HEADING_1,
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 400 },
+      })
+    );
+
+    // Data de geração
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: `Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`,
+            italics: true,
+            size: 20,
+          }),
+        ],
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 400 },
+      })
+    );
+
+    // Para cada pessoa selecionada
+    selectedPeople.forEach((person, index) => {
+      // Nome como título
+      children.push(
+        new Paragraph({
+          text: person.nome,
+          heading: HeadingLevel.HEADING_2,
+          spacing: { before: 400, after: 200 },
+        })
+      );
+
+      // Cria tabela com os dados
+      const tableRows = [];
+      
+      selectedColumns.filter(key => key !== 'nome').forEach(colKey => {
+        const col = ALL_COLUMNS.find(c => c.key === colKey);
+        const value = person[colKey] || '-';
+        
+        tableRows.push(
+          new TableRow({
+            children: [
+              new TableCell({
+                children: [new Paragraph({ 
+                  children: [new TextRun({ text: col.label, bold: true })],
+                })],
+                width: { size: 3000, type: WidthType.DXA },
+                shading: { fill: 'E8E8E8' },
+              }),
+              new TableCell({
+                children: [new Paragraph({ text: value })],
+                width: { size: 6000, type: WidthType.DXA },
+              }),
+            ],
+          })
+        );
+      });
+
+      if (tableRows.length > 0) {
+        children.push(
+          new Table({
+            rows: tableRows,
+            width: { size: 100, type: WidthType.PERCENTAGE },
+          })
+        );
+      }
+
+      // Separador entre pessoas
+      if (index < selectedPeople.length - 1) {
+        children.push(
+          new Paragraph({
+            text: '',
+            spacing: { after: 200 },
+            border: {
+              bottom: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
+            },
+          })
+        );
+      }
+    });
+
+    // Cria o documento
+    const doc = new Document({
+      sections: [{
+        properties: {},
+        children: children,
+      }],
+    });
+
+    // Gera e baixa o arquivo
+    const blob = await Packer.toBlob(doc);
+    const fileName = `cadastros_${new Date().toISOString().split('T')[0]}.docx`;
+    saveAs(blob, fileName);
   };
 
   // Salvar novo cadastro (simulado - mostra os dados)
@@ -388,15 +542,14 @@ const ConsultaCadastro = () => {
                   onChange={(e) => {
                     setSearchTerm(e.target.value);
                     setShowSuggestions(true);
-                    if (!e.target.value) setSelectedPerson(null);
                   }}
                   onFocus={() => setShowSuggestions(true)}
-                  placeholder="Digite o nome para buscar..."
+                  placeholder="Digite o nome para adicionar à consulta..."
                   className="w-full pl-12 pr-12 py-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-transparent text-lg"
                 />
                 {searchTerm && (
                   <button
-                    onClick={clearSearch}
+                    onClick={() => setSearchTerm('')}
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
                   >
                     <X className="w-5 h-5" />
@@ -411,7 +564,7 @@ const ConsultaCadastro = () => {
                 {suggestions.map((person, index) => (
                   <button
                     key={index}
-                    onClick={() => selectPerson(person)}
+                    onClick={() => addPerson(person)}
                     className="w-full px-4 py-3 text-left hover:bg-white/10 flex items-center gap-3 border-b border-white/10 last:border-0"
                   >
                     <User className="w-5 h-5 text-blue-400" />
@@ -426,6 +579,41 @@ const ConsultaCadastro = () => {
               </div>
             )}
           </div>
+
+          {/* Pessoas Selecionadas (tags) */}
+          {selectedPeople.length > 0 && (
+            <div className="mt-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Users className="w-4 h-4 text-blue-300" />
+                <span className="text-blue-200 text-sm font-medium">
+                  {selectedPeople.length} pessoa(s) selecionada(s)
+                </span>
+                <button
+                  onClick={clearSearch}
+                  className="ml-auto text-red-400 hover:text-red-300 text-sm flex items-center gap-1"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  Limpar todos
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {selectedPeople.map((person, index) => (
+                  <span
+                    key={index}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-500/30 text-white rounded-full text-sm"
+                  >
+                    {person.nome}
+                    <button
+                      onClick={() => removePerson(person)}
+                      className="hover:bg-white/20 rounded-full p-0.5"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
           
           {error && (
             <div className="mt-4 p-3 bg-yellow-500/20 border border-yellow-500/30 rounded-lg flex items-center gap-2 text-yellow-200 text-sm">
@@ -435,72 +623,105 @@ const ConsultaCadastro = () => {
           )}
         </div>
 
-        {/* Resultado da Busca */}
-        {selectedPerson && (
-          <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 animate-fadeIn">
-            <div className="flex items-center gap-3 mb-6 pb-4 border-b border-white/20">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-xl flex items-center justify-center">
-                <User className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-white">{selectedPerson.nome}</h2>
-                <p className="text-blue-200 text-sm">Dados cadastrais</p>
-              </div>
-            </div>
+        {/* Botões de Exportação */}
+        {selectedPeople.length > 0 && (
+          <div className="flex flex-wrap gap-3 justify-center mb-6">
+            <button
+              onClick={exportToXLSX}
+              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white rounded-xl transition-all shadow-lg"
+            >
+              <FileSpreadsheet className="w-5 h-5" />
+              Exportar para Excel (XLSX)
+            </button>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {selectedColumns
-                .filter(key => key !== 'nome')
-                .map(key => {
-                  const col = ALL_COLUMNS.find(c => c.key === key);
-                  const value = selectedPerson[key] || '-';
-                  
-                  return (
-                    <div 
-                      key={key}
-                      className="bg-white/5 rounded-xl p-4 group hover:bg-white/10 transition-all"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-blue-300/70 text-xs font-medium uppercase tracking-wide mb-1">
-                            {col?.label}
-                          </p>
-                          <p className="text-white text-base break-words">
-                            {col?.key === 'lattes' && value !== '-' ? (
-                              <a 
-                                href={value} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="text-blue-400 hover:text-blue-300 underline"
+            <button
+              onClick={exportToDOCX}
+              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-xl transition-all shadow-lg"
+            >
+              <FileText className="w-5 h-5" />
+              Exportar para Word (DOCX)
+            </button>
+          </div>
+        )}
+
+        {/* Resultado da Busca - Múltiplas Pessoas */}
+        {selectedPeople.length > 0 && (
+          <div className="space-y-6">
+            {selectedPeople.map((person, personIndex) => (
+              <div key={personIndex} className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 animate-fadeIn">
+                <div className="flex items-center gap-3 mb-6 pb-4 border-b border-white/20">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-xl flex items-center justify-center">
+                    <User className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <h2 className="text-xl font-bold text-white">{person.nome}</h2>
+                    <p className="text-blue-200 text-sm">Dados cadastrais</p>
+                  </div>
+                  <button
+                    onClick={() => removePerson(person)}
+                    className="p-2 text-white/40 hover:text-red-400 hover:bg-white/10 rounded-lg transition-all"
+                    title="Remover da seleção"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {selectedColumns
+                    .filter(key => key !== 'nome')
+                    .map(key => {
+                      const col = ALL_COLUMNS.find(c => c.key === key);
+                      const value = person[key] || '-';
+                      const uniqueKey = `${personIndex}-${key}`;
+                      
+                      return (
+                        <div 
+                          key={key}
+                          className="bg-white/5 rounded-xl p-4 group hover:bg-white/10 transition-all"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-blue-300/70 text-xs font-medium uppercase tracking-wide mb-1">
+                                {col?.label}
+                              </p>
+                              <p className="text-white text-base break-words">
+                                {col?.key === 'lattes' && value !== '-' ? (
+                                  <a 
+                                    href={value} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="text-blue-400 hover:text-blue-300 underline"
+                                  >
+                                    {value}
+                                  </a>
+                                ) : value}
+                              </p>
+                            </div>
+                            {value !== '-' && (
+                              <button
+                                onClick={() => copyToClipboard(value, uniqueKey)}
+                                className="ml-2 p-2 text-white/30 hover:text-white hover:bg-white/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                title="Copiar"
                               >
-                                {value}
-                              </a>
-                            ) : value}
-                          </p>
-                        </div>
-                        {value !== '-' && (
-                          <button
-                            onClick={() => copyToClipboard(value, key)}
-                            className="ml-2 p-2 text-white/30 hover:text-white hover:bg-white/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                            title="Copiar"
-                          >
-                            {copiedField === key ? (
-                              <Check className="w-4 h-4 text-green-400" />
-                            ) : (
-                              <Copy className="w-4 h-4" />
+                                {copiedField === uniqueKey ? (
+                                  <Check className="w-4 h-4 text-green-400" />
+                                ) : (
+                                  <Copy className="w-4 h-4" />
+                                )}
+                              </button>
                             )}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
         {/* Lista de pessoas (quando não há busca) */}
-        {!selectedPerson && !searchTerm && data.length > 0 && (
+        {selectedPeople.length === 0 && !searchTerm && data.length > 0 && (
           <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
             <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
               <Database className="w-5 h-5" />
@@ -510,7 +731,7 @@ const ConsultaCadastro = () => {
               {data.slice(0, 12).map((person, index) => (
                 <button
                   key={index}
-                  onClick={() => selectPerson(person)}
+                  onClick={() => addPerson(person)}
                   className="flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-all text-left"
                 >
                   <div className="w-10 h-10 bg-gradient-to-br from-blue-500/50 to-cyan-500/50 rounded-lg flex items-center justify-center">
