@@ -26,9 +26,10 @@ const ALL_COLUMNS = [
   { key: 'celular', label: 'Celular' },
   { key: 'programa', label: 'Programa' },
   { key: 'lattes', label: 'Link Lattes' },
-  { key: 'bancoPix', label: 'Banco PIX' },
-  { key: 'agenciaPix', label: 'Agência PIX' },
-  { key: 'contaPix', label: 'Conta Corrente PIX' },
+  { key: 'banco', label: 'Banco' },
+  { key: 'pix', label: 'PIX' },
+  { key: 'agencia', label: 'Agência' },
+  { key: 'conta', label: 'Conta Corrente' },
   { key: 'banco2', label: 'Banco 2' },
   { key: 'agencia2', label: 'Agência 2' },
   { key: 'conta2', label: 'Conta Corrente 2' },
@@ -39,7 +40,7 @@ const COLUMN_GROUPS = [
   { name: 'Dados Pessoais', columns: ['nome', 'email', 'cpf', 'rg', 'nascimento', 'orgaoExpedidor', 'expedicaoRg'] },
   { name: 'Contato', columns: ['email', 'telFixo', 'celular', 'endereco'] },
   { name: 'Profissional', columns: ['formacao', 'matricula', 'ctf', 'conselho', 'programa', 'lattes'] },
-  { name: 'Dados Bancários', columns: ['bancoPix', 'agenciaPix', 'contaPix', 'banco2', 'agencia2', 'conta2'] },
+  { name: 'Dados Bancários', columns: ['banco', 'pix', 'agencia', 'conta', 'banco2', 'agencia2', 'conta2'] },
 ];
 
 const ConsultaCadastro = () => {
@@ -420,7 +421,7 @@ const ConsultaCadastro = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 p-4 md:p-8">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-screen-2xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-2xl shadow-lg mb-4">
@@ -666,7 +667,7 @@ const ConsultaCadastro = () => {
                   </button>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                   {selectedColumns
                     .filter(key => key !== 'nome')
                     .map(key => {
@@ -677,7 +678,7 @@ const ConsultaCadastro = () => {
                       return (
                         <div 
                           key={key}
-                          className="bg-white/5 rounded-xl p-4 group hover:bg-white/10 transition-all"
+                          className="bg-white/5 rounded-xl p-3 group hover:bg-white/10 transition-all"
                         >
                           <div className="flex items-start justify-between">
                             <div className="flex-1 min-w-0">
